@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.styles import Style
 
 
 class InteractiveSession:
@@ -9,17 +10,47 @@ class InteractiveSession:
 
     def __init__(self) -> None:
         """Initialize the session."""
-        self._session = PromptSession()
+        style = Style.from_dict(
+            {
+                "prompt.title": "ansicyan bold",
+                "prompt.pipe": "ansicyan",
+                "prompt.hint": "ansibrightblack",
+                "prompt.cmd": "ansimagenta",
+            }
+        )
+        self._session = PromptSession(style=style)
 
     def read_block(self, *, mode: str, provider: str, model: str) -> str | None:
         """Read a block of text."""
         header = FormattedText(
             [
-                ("class:prompt", f"[{mode} | {provider} | {model}]"),
+                ("class:prompt.title", "["),
+                ("class:prompt.title", mode),
+                ("class:prompt.pipe", " | "),
+                ("class:prompt.title", provider),
+                ("class:prompt.pipe", " | "),
+                ("class:prompt.title", model),
+                ("class:prompt.title", "]"),
                 (
-                    "",
-                    " Paste text. Submit with an empty line. Commands: :mode, :provider, :model, :quit\n",
+                    "class:prompt.hint",
+                    " Paste text. Submit with an empty line. Commands: ",
                 ),
+                ("class:prompt.cmd", ":mode"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":provider"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":model"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":explain"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":pretty"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":show"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":where"),
+                ("class:prompt.hint", ", "),
+                ("class:prompt.cmd", ":quit"),
+                ("class:prompt.hint", "\n"),
             ]
         )
 

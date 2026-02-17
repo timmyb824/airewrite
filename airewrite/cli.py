@@ -82,6 +82,7 @@ def _print_config(
     typer.echo(f"history: {history}")
     typer.echo(f"history_days: {history_days}")
     typer.echo(f"history_dir: {str(history_root(history_dir))}")
+    typer.echo("")
 
 
 def _print_paths(*, history_dir: str | None) -> None:
