@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.1.0 (2026-02-17)
+
+### Features
+
+- Add color styling to interactive prompt and improve command hints
+  ([`fcc2da9`](https://github.com/timmyb824/airewrite/commit/fcc2da903302584375178c44fbaa6b2a87a3def3))
+
+Add styled prompt with cyan headers and magenta commands, list all available commands in hint text,
+  and add blank line after config output for better readability
+
+
 ## v0.0.1 (2026-02-17)
 
 ### Continuous Integration
