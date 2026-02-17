@@ -29,7 +29,6 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Code quality checks
-        if: success()
         shell: bash
         run: |
           uv run black --check .
