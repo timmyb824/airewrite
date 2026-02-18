@@ -472,7 +472,15 @@ def run(
         if cur_pretty:
             title = f"{cur_mode} | {cur_provider} | {cur_model}"
             _console.print(Rule(title, style="cyan"))
-            _console.print(Panel(out, border_style="cyan", box=box.HORIZONTALS))
+            _console.print(
+                Panel(
+                    out,
+                    border_style="cyan",
+                    box=box.HORIZONTALS,
+                    padding=(0, 0),
+                    expand=False,
+                )
+            )
         else:
             sep = _separator_line("-")
             sys.stdout.write(f"{sep}\n")
