@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-02-18)
+
+### Continuous Integration
+
+- Add pre-commit configuration with code quality and security hooks
+  ([`b23259e`](https://github.com/timmyb824/airewrite/commit/b23259ed0948bbc51100251cc87e307d0d3d42e1))
+
+Add pre-commit config with sourcery, black, isort, conventional commits, secret scanning, and
+  standard hooks. Add uv-lock and uv-export hooks for dependency management. Fix import ordering
+  across all modules to comply with isort black profile. Generate requirements.txt from uv export.
+
+### Features
+
+- Add help command to interactive session with command reference
+  ([`b071749`](https://github.com/timmyb824/airewrite/commit/b071749a4abf0f21c543858bb94ba4adbe961701))
+
+Add :help command that displays all available session commands and their usage. Update interactive
+  prompt hint to include :help as first command option.
+
+- Add token usage tracking and cost estimation with spend command
+  ([`c80e073`](https://github.com/timmyb824/airewrite/commit/c80e07387b522ff27612ba6cf7914ae2cfbdbd2c))
+
+Add Usage and Result dataclasses to track token consumption, update providers to return usage data,
+  store token counts in history events, add --stats flag to display per-request metrics, implement
+  spend command to calculate monthly costs from history, and add interactive commands for toggling
+  stats and viewing spend
+
+
 ## v0.2.0 (2026-02-18)
 
 ### Features
