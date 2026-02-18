@@ -4,7 +4,6 @@ from pathlib import Path
 
 from airewrite.config import config_dir
 
-
 _DEFAULT_MODES: dict[str, str] = {
     "proofread": "You are a careful proofreader. Fix grammar, spelling, punctuation, and obvious clarity issues. Preserve meaning and tone. Return only the improved text.",
     "rewrite": "Rewrite the text for clarity and flow while preserving meaning and tone. Return only the rewritten text.",
