@@ -262,7 +262,7 @@ def run(
     print_config: Annotated[bool, typer.Option("--print-config")] = False,
     pretty: Annotated[bool, typer.Option("--pretty/--no-pretty")] = True,
     stats: Annotated[bool, typer.Option("--stats/--no-stats")] = False,
-):
+):  # sourcery skip: low-code-quality
     """Rewrite text using an LLM. If stdin is piped, processes once; otherwise starts an interactive session."""
 
     instructions = load_mode_instructions(mode)
@@ -358,6 +358,20 @@ def run(
 
             if cmd in {"quit", "q", "exit"}:
                 break
+            if cmd in {"help", "h", "?"}:
+                typer.echo("Session commands:")
+                typer.echo("- :help                Show this help")
+                typer.echo("- :mode <name>          Set mode")
+                typer.echo("- :provider <name>      Set provider (openai|anthropic)")
+                typer.echo("- :model <name>         Set model")
+                typer.echo("- :explain              Toggle explanations")
+                typer.echo("- :pretty               Toggle pretty output")
+                typer.echo("- :stats                Toggle token/cost stats")
+                typer.echo("- :spend [YYYY-MM] [verbose]  Show estimated spend")
+                typer.echo("- :show                 Show current config")
+                typer.echo("- :where                Show paths")
+                typer.echo("- :quit                 Exit")
+                continue
             if cmd in {"show", "config"}:
                 _print_config(
                     mode=cur_mode,

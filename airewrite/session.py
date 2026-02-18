@@ -35,6 +35,8 @@ class InteractiveSession:
                     "class:prompt.hint",
                     " Paste text. Submit with an empty line. Commands: ",
                 ),
+                ("class:prompt.cmd", ":help"),
+                ("class:prompt.hint", ", "),
                 ("class:prompt.cmd", ":mode"),
                 ("class:prompt.hint", ", "),
                 ("class:prompt.cmd", ":provider"),
