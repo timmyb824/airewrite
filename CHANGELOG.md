@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-02-18)
+
+### Features
+
+- Remove padding from output panel for tighter formatting
+  ([`ab3ca57`](https://github.com/timmyb824/airewrite/commit/ab3ca57e342ae8e27bbcafc31878b30944908227))
+
+
 ## v0.3.0 (2026-02-18)
 
 ### Continuous Integration
