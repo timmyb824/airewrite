@@ -5,6 +5,7 @@ import sys
 from typing import Annotated, Optional
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
@@ -279,7 +280,7 @@ def run(
         if cur_pretty:
             title = f"{cur_mode} | {cur_provider} | {cur_model}"
             _console.print(Rule(title, style="cyan"))
-            _console.print(Panel(out, border_style="cyan"))
+            _console.print(Panel(out, border_style="cyan", box=box.HORIZONTALS))
         else:
             sep = _separator_line("-")
             sys.stdout.write(f"{sep}\n")
