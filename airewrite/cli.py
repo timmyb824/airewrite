@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+import json
 import shutil
 import sys
 from typing import Annotated, Optional
@@ -19,10 +21,11 @@ from airewrite.history import (
     now_utc_iso,
 )
 from airewrite.modes import load_mode_instructions, mode_path
-from airewrite.providers.base import Message, ProviderError, LLMProvider
+from airewrite.providers.base import Message, ProviderError, LLMProvider, Result, Usage
 from airewrite.providers.anthropic import AnthropicProvider
 from airewrite.providers.openai import OpenAIProvider
 from airewrite.session import InteractiveSession
+from airewrite.stats import estimate_cost_usd, format_stats
 
 app = typer.Typer(add_completion=False)
 _console = Console()
@@ -126,6 +129,127 @@ def paths(
     _print_paths(history_dir=history_dir)
 
 
+def _month_start(d: date) -> date:
+    """Get the first day of the month."""
+    return date(d.year, d.month, 1)
+
+
+def _parse_month(value: str | None) -> date:
+    """Parse a month string."""
+    if not value:
+        return _month_start(date.today())
+    try:
+        dt = datetime.strptime(value, "%Y-%m").date()
+    except ValueError as e:
+        raise typer.BadParameter("--month must be in YYYY-MM format") from e
+    return _month_start(dt)
+
+
+def _compute_spend(
+    *, start: date, history_dir: str | None
+) -> tuple[dict[str, float], dict[str, int], dict[str, dict[str, int]]]:
+    # sourcery skip: extract-duplicate-method
+    """Compute spend."""
+    root = history_root(history_dir)
+    totals: dict[str, float] = {}
+    unknown: dict[str, int] = {}
+    unknown_reasons: dict[str, dict[str, int]] = {}
+
+    if not root.exists():
+        return totals, unknown, unknown_reasons
+
+    for p in sorted(root.glob("*.jsonl")):
+        try:
+            day = date.fromisoformat(p.stem)
+        except ValueError:
+            continue
+        if day < start:
+            continue
+
+        for line in p.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            provider = str(evt.get("provider") or "unknown")
+            model = str(evt.get("model") or "")
+
+            cost = evt.get("est_cost_usd")
+            if isinstance(cost, (int, float)):
+                totals[provider] = totals.get(provider, 0.0) + float(cost)
+                continue
+
+            in_tok = evt.get("input_tokens")
+            out_tok = evt.get("output_tokens")
+            if isinstance(in_tok, int) and isinstance(out_tok, int):
+                usage = Usage(input_tokens=in_tok, output_tokens=out_tok)
+                est = estimate_cost_usd(provider=provider, model=model, usage=usage)
+                if est is not None:
+                    totals[provider] = totals.get(provider, 0.0) + est
+                else:
+                    unknown[provider] = unknown.get(provider, 0) + 1
+                    unknown_reasons.setdefault(provider, {}).setdefault(
+                        "unknown_model_pricing", 0
+                    )
+                    unknown_reasons[provider]["unknown_model_pricing"] += 1
+            else:
+                unknown[provider] = unknown.get(provider, 0) + 1
+                unknown_reasons.setdefault(provider, {}).setdefault("missing_tokens", 0)
+                unknown_reasons[provider]["missing_tokens"] += 1
+
+    return totals, unknown, unknown_reasons
+
+
+def _print_spend(*, start: date, history_dir: str | None, verbose: bool) -> None:
+    """Print spend."""
+    totals, unknown, unknown_reasons = _compute_spend(
+        start=start, history_dir=history_dir
+    )
+    month_label = start.strftime("%Y-%m")
+
+    if not totals and not unknown:
+        typer.echo(f"No spend data found for {month_label}.")
+        return
+
+    typer.echo(f"Estimated airewrite spend for {month_label} (local history):")
+    grand_total = 0.0
+    for prov in sorted(totals):
+        amt = totals[prov]
+        grand_total += amt
+        suffix = ""
+        if unknown.get(prov):
+            suffix = f" (plus {unknown[prov]} unknown)"
+        typer.echo(f"- {prov}: ${amt:.4f}{suffix}")
+
+    for prov in sorted(k for k in unknown if k not in totals):
+        typer.echo(f"- {prov}: n/a (only unknown: {unknown[prov]})")
+
+    if verbose and unknown_reasons:
+        typer.echo("\nUnknown breakdown:")
+        for prov in sorted(unknown_reasons):
+            reasons = unknown_reasons[prov]
+            typer.echo(f"- {prov}:")
+            for reason, count in sorted(reasons.items()):
+                typer.echo(f"  - {reason}: {count}")
+
+    typer.echo(f"Total: ${grand_total:.4f}")
+
+
+@app.command(name="spend")
+def spend(
+    month: Annotated[Optional[str], typer.Option("--month")] = None,
+    history_dir: Annotated[Optional[str], typer.Option("--history-dir")] = None,
+    verbose: Annotated[bool, typer.Option("--verbose")] = False,
+):
+    """Estimate spend by summing per-request costs from local history."""
+
+    start = _parse_month(month)
+    _print_spend(start=start, history_dir=history_dir, verbose=verbose)
+
+
 @app.command()
 def run(
     mode: Annotated[str, typer.Option("--mode", "-m")] = "rewrite",
@@ -137,6 +261,7 @@ def run(
     history_dir: Annotated[Optional[str], typer.Option("--history-dir")] = None,
     print_config: Annotated[bool, typer.Option("--print-config")] = False,
     pretty: Annotated[bool, typer.Option("--pretty/--no-pretty")] = True,
+    stats: Annotated[bool, typer.Option("--stats/--no-stats")] = False,
 ):
     """Rewrite text using an LLM. If stdin is piped, processes once; otherwise starts an interactive session."""
 
@@ -164,9 +289,19 @@ def run(
             instructions=instructions, explain=explain, text=text
         )
         try:
-            out = provider_client.generate(messages=messages, model=model_name)
+            result: Result = provider_client.generate(
+                messages=messages, model=model_name
+            )
         except ProviderError as e:
             raise typer.Exit(code=1) from e
+
+        out = result.text
+        usage = result.usage
+        est_cost = (
+            estimate_cost_usd(provider=provider, model=model_name, usage=usage)
+            if usage is not None
+            else None
+        )
 
         if history:
             append_event(
@@ -178,8 +313,17 @@ def run(
                     explain=explain,
                     input_text=text,
                     output_text=out,
+                    input_tokens=usage.input_tokens if usage is not None else None,
+                    output_tokens=usage.output_tokens if usage is not None else None,
+                    est_cost_usd=est_cost,
                 ),
                 history_dir=history_dir,
+            )
+
+        if stats and result.usage is not None:
+            typer.echo(
+                format_stats(provider=provider, model=model_name, usage=result.usage),
+                err=True,
             )
 
         sys.stdout.write(out)
@@ -194,6 +338,7 @@ def run(
     cur_model = model_name
     cur_explain = explain
     cur_pretty = pretty
+    cur_stats = stats
 
     while True:
         block = session.read_block(
@@ -247,6 +392,28 @@ def run(
                 cur_pretty = not cur_pretty
                 typer.echo(f"pretty: {cur_pretty}")
                 continue
+            if cmd == "stats":
+                cur_stats = not cur_stats
+                typer.echo(f"stats: {cur_stats}")
+                continue
+            if cmd == "spend":
+                month_arg = None
+                verbose_arg = False
+                extra = parts[1:]
+                for token in extra:
+                    if token == "verbose":
+                        verbose_arg = True
+                    else:
+                        month_arg = token
+
+                try:
+                    start = _parse_month(month_arg)
+                except typer.BadParameter as e:
+                    typer.echo(str(e), err=True)
+                    continue
+
+                _print_spend(start=start, history_dir=history_dir, verbose=verbose_arg)
+                continue
 
             typer.echo("Unknown command.", err=True)
             continue
@@ -258,10 +425,18 @@ def run(
         )
 
         try:
-            out = provider_client.generate(messages=messages, model=cur_model)
+            result = provider_client.generate(messages=messages, model=cur_model)
         except ProviderError as e:
             typer.echo(str(e), err=True)
             continue
+
+        out = result.text
+        usage = result.usage
+        est_cost = (
+            estimate_cost_usd(provider=cur_provider, model=cur_model, usage=usage)
+            if usage is not None
+            else None
+        )
 
         if history:
             append_event(
@@ -273,6 +448,9 @@ def run(
                     explain=cur_explain,
                     input_text=block,
                     output_text=out,
+                    input_tokens=usage.input_tokens if usage is not None else None,
+                    output_tokens=usage.output_tokens if usage is not None else None,
+                    est_cost_usd=est_cost,
                 ),
                 history_dir=history_dir,
             )
@@ -288,6 +466,14 @@ def run(
             if not out.endswith("\n"):
                 sys.stdout.write("\n")
             sys.stdout.write(f"{sep}\n")
+
+        if cur_stats and result.usage is not None:
+            _console.print(
+                format_stats(
+                    provider=cur_provider, model=cur_model, usage=result.usage
+                ),
+                style="dim",
+            )
 
 
 @app.command()

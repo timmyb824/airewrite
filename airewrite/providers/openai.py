@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from airewrite.providers.base import Message, ProviderError
+from airewrite.providers.base import Message, ProviderError, Result, Usage
 
 
 class OpenAIProvider:
@@ -14,7 +14,8 @@ class OpenAIProvider:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
 
-    def generate(self, *, messages: list[Message], model: str) -> str:
+    def generate(self, *, messages: list[Message], model: str) -> Result:
+        # sourcery skip: extract-method
         """Generate text."""
         url = f"{self._base_url}/v1/chat/completions"
         payload = {
@@ -35,6 +36,11 @@ class OpenAIProvider:
 
         data = resp.json()
         try:
-            return data["choices"][0]["message"]["content"].strip()
+            text = data["choices"][0]["message"]["content"].strip()
+            usage_data = data.get("usage") or {}
+            prompt_tokens = int(usage_data.get("prompt_tokens") or 0)
+            completion_tokens = int(usage_data.get("completion_tokens") or 0)
+            usage = Usage(input_tokens=prompt_tokens, output_tokens=completion_tokens)
+            return Result(text=text, usage=usage)
         except Exception as e:  # noqa: BLE001
             raise ProviderError(f"OpenAI API response parse error: {e}") from e

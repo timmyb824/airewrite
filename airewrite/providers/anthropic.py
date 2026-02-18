@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from airewrite.providers.base import Message, ProviderError
+from airewrite.providers.base import Message, ProviderError, Result, Usage
 
 
 class AnthropicProvider:
@@ -19,7 +19,8 @@ class AnthropicProvider:
         self._base_url = base_url.rstrip("/")
         self._anthropic_version = anthropic_version
 
-    def generate(self, *, messages: list[Message], model: str) -> str:
+    def generate(self, *, messages: list[Message], model: str) -> Result:
+        # sourcery skip: extract-method
         """Generate text using the Anthropic API."""
         url = f"{self._base_url}/v1/messages"
 
@@ -54,6 +55,10 @@ class AnthropicProvider:
         try:
             parts = data["content"]
             text = "".join(p.get("text", "") for p in parts)
-            return text.strip()
+            usage_data = data.get("usage") or {}
+            input_tokens = int(usage_data.get("input_tokens") or 0)
+            output_tokens = int(usage_data.get("output_tokens") or 0)
+            usage = Usage(input_tokens=input_tokens, output_tokens=output_tokens)
+            return Result(text=text.strip(), usage=usage)
         except Exception as e:  # noqa: BLE001
             raise ProviderError(f"Anthropic API response parse error: {e}") from e
