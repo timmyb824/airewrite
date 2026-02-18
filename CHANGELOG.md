@@ -1,6 +1,16 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-02-18)
+
+### Features
+
+- Use horizontal box style for output panel borders
+  ([`9550ff5`](https://github.com/timmyb824/airewrite/commit/9550ff5978292f49812f7160e6a1df89521fafd6))
+
+Change panel border from default box style to HORIZONTALS for cleaner output appearance
+
+
 ## v0.1.0 (2026-02-17)
 
 ### Features
