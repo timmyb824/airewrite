@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from datetime import date, datetime, timedelta, timezone
+import contextlib
 import json
 import os
+from dataclasses import asdict, dataclass
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from airewrite.config import config_dir
@@ -20,6 +21,9 @@ class HistoryEvent:
     explain: bool
     input_text: str
     output_text: str
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    est_cost_usd: float | None = None
 
 
 def history_root(history_dir: str | None = None) -> Path:
@@ -61,10 +65,8 @@ def cleanup_history(*, keep_days: int, history_dir: str | None = None) -> None:
         except ValueError:
             continue
         if day < cutoff:
-            try:
+            with contextlib.suppress(OSError):
                 p.unlink()
-            except OSError:
-                pass
 
 
 def now_utc_iso() -> str:
